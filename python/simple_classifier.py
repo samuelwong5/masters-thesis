@@ -52,7 +52,7 @@ x = tf.placeholder(tf.float32, [None, n_input])
 y = tf.placeholder(tf.float32, [None, n_classes])
 dim = tf.placeholder(tf.int32)
 
-model = MAX #either MAX or FFNN
+model = FFNN #either MAX or FFNN
 
 if model == MAX:
     pred = model(x, weights, biases, dim)

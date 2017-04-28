@@ -14,6 +14,58 @@
 
 #source("CLASS_DataVST.R")
 
+loadAE_63063 = function() {
+  # Import libraries
+  
+  require( R.utils );
+  require( data.table );
+  require( pracma );
+  
+  expression_iGiS <- getPreprocessedFiles( folder = "C:/Users/cwong/masters-thesis/data/E-GEOD-63063/samples/1/",
+                                           nameColum = "Reporter.Identifier",
+                                           expColum = "VALUE" );
+  
+  expression_e_iGiS <- getGeneNames_ADF(expression_iGiS = expression_iGiS,
+                                        fileADF = "C:/Users/cwong/masters-thesis/data/E-GEOD-63063/A-GEOD-10558.adf.txt",
+                                        columnName = "Reporter.Database.Entry..genbank.");
+  
+  library( org.Hs.eg.db );
+  entrez_iG <- as.list(org.Hs.egACCNUM2EG);
+  print(entrez_iG[1:10])
+  iGs_exist <- names( entrez_iG ) %in% dimnames( expression_e_iGiS )[[1]];
+  entrez_iG <- entrez_iG[ iGs_exist ]; 
+  entrez_iG <- unlist( entrez_iG );
+
+
+  expression_te_iGiS <- expression_e_iGiS[ names( entrez_iG ), ];
+
+  dimnames( expression_te_iGiS )[[1]] <- entrez_iG;
+  print(dim(expression_te_iG))
+  print(expression_te_iGiS[1:10, 1:10])
+  save( file = "loadAE_E-GEOD-48350_security.Rdata", list = c( "expression_te_iGiS" ) );
+  rm( expression_iGiS );
+  rm( expression_e_iGiS );
+  
+  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_te_iGiS, 
+                                             factorName_sdrf_iF = c( "Characteristics..age.", 
+                                                                     "Characteristics..sex."),
+                                             factorName_iF = c( "age", "gender" ), 
+                                             fileSDRF = "C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063.sdrf.txt" );
+  demographics_iSiC[ ,"age"] <- sapply( demographics_iSiC[ ,"age"],
+                                        function( s ){
+                                          return( strsplit( s, " ")[[1]][1] );
+                                        } );
+  demographics_iSiC[ demographics_iSiC[ ,"age"] == ">90", "age" ] <- 90;
+  
+  stopifnot( all( dimnames( demographics_iSiC )[[1]] %in% dimnames( expression_te_iGiS )[[2]] ) );
+  all_iSiC <- as.data.frame( t( expression_te_iGiS ) );
+  all_iSiC <- cbind( demographics_iSiC,
+                     all_iSiC[ dimnames( demographics_iSiC )[[1]], ] );
+  all_iSiC$age <- as.numeric( as.character( all_iSiC$age ) );
+  
+  write.csv(all_iSiC, file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined.csv")
+}
+
 loadAE_48350 = function(){
   # Postmortem brain in AD. 250 people
   
@@ -797,7 +849,7 @@ getRawFiles = function( folder ){
         return( substr( s, iS_start+1, iS_end-1 ) );
       });
     }
-    expression_iGiS[ ,iF] <- expression_iGiC[ ,expColum];
+    expression_iGiS[ ,iF] <- expression_iGiC[ ,expColum]; 
     stopifnot( all( dimnames( expression_iGiS )[[1]] == expression_iGiC[ ,nameColum] ) );
     
   }
@@ -830,7 +882,7 @@ getPreprocessedFiles = function( folder, nameColum, expColum ){
     if( mod( iF, 100 ) == 1 ){
       print( paste( match.call()[1], " = Loading file ", iF, " of ", length(files_iF), sep="") );
     }
-    
+  
     # Load this subject
     expression_iGiC <- read.table( file = files_iF[iF],
                                    header = TRUE, 
@@ -880,21 +932,21 @@ getDemographics_SDRF = function( expression_iGiS,
   demographics_iRiC <- read.table( file = fileSDRF,
                                    header = TRUE,
                                    fill = TRUE,
-                                   sep = ",",
+                                   sep = "\t",
                                    comment.char = "",
                                    quote = "");
-  
   # Find index correspondence
   
-  print(dimnames(demographics_iRiC)[[2]])
   subjectID_iR <- as.character( demographics_iRiC[ ,"Source.Name"] );
+
+  print(dimnames(demographics_iRiC)[[2]]);
   subjectID_iS <- dimnames( expression_iGiS )[[2]];
   subjectID_iS <- paste( subjectID_iS,
                          nameExtension,
                          sep = " " )
   iR_iS <- match( subjectID_iS, subjectID_iR );
 
-  stopifnot( length( iR_iS ) == length( unique( iR_iS ) ) ); # stop("At least one subject is represented more than 1");
+  #stopifnot( length( iR_iS ) == length( unique( iR_iS ) ) ); # stop("At least one subject is represented more than 1");
   
   # Get interesting demographics
   demographics_iSiC <- array( data = NA, dim = c( dim( expression_iGiS )[2], length( factorName_sdrf_iF ) ) );
@@ -922,8 +974,9 @@ getGeneNames_ADF = function( expression_iGiS, fileADF, columnName = "Composite.E
   geneIDs_iRiC <- read.table( file = fileADF,
                               header = TRUE,
                               fill = TRUE,
-                              sep = "\t");
-  iR_iG <- match( reporterID_iG, geneIDs_iRiC[ ,1] );
+                              sep = ",");
+  iR_iG <- match( reporterID_iG, geneIDs_iRiC[ , 1] );
+
   entrezID_iG <- geneIDs_iRiC[iR_iG,columnName];
   # Eliminate genes with no entrez name
   stopifnot( sum( is.na(entrezID_iG) ) < round( 0.5 * length( entrezID_iG ) ) ); #More than half the probes have no entrez name
