@@ -10,6 +10,8 @@ fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
 
 
 x, y = DataReader(fp).get_data()
+argmax = lambda x: x.index(max(x))
+y = list(map(argmax, y))
 partition = partition_data(x, y, [0.8, 0.2])
 
 mli = lambda x: np.array(x).astype(float)
@@ -33,3 +35,14 @@ rf = RandomForestClassifier(n_estimators=rf_CV.best_params_['n_estimators'],
 rf.fit(train_x, train_y)
 test_y_pred = rf.predict(test_x)
 print(accuracy_score(test_y_pred, test_y))
+
+class Classifier:
+    def __init__(self):
+        self.classifier = None
+    
+    def train(self, x, y):
+        assert self.classifier, 'Classifier not initialized'
+        self.classifier.fit(x, y)
+
+    def predict(self, x):
+        return self.classifier.predict(x)
