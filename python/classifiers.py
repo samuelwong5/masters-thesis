@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 import sys
 
-from util import DataReader, partition_data
+from util import DataReader, partition_data, CrossValidation
 
 try:
     classifier = sys.argv[1]
@@ -16,7 +16,10 @@ except:
     sys.exit(-1)
 
 iterations = 1 if len(sys.argv) < 3 else int(sys.argv[2])
+
+
 fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
+#fp = '../data/E-GEOD-63063/E-GEOD-63063-combined.csv'
 
 print('Reading file')
 x, y = DataReader(fp).get_data()
@@ -24,8 +27,6 @@ argmax = lambda x: x.index(max(x))
 y = list(map(argmax, y)) # Convert labels to 1-d
 
 def part(x, y):
-    shuffle(x)
-    shuffle(y)
     partition = partition_data(x, y, [0.8, 0.2])
     mli = lambda x: np.array(x)
     train_x = mli(partition[0][0])
@@ -35,15 +36,23 @@ def part(x, y):
     return train_x, train_y, test_x, test_y
 
 mean_acc = 0.0
-for i in range(iterations):
+folds = 5
+data = CrossValidation(x, y, folds)
+
+for i in range(folds):
     print('[Iteration {0:2d}]'.format(i))
     print(' - Shuffling data')
-    train_x, train_y, test_x, test_y = part(x, y)
-    
-    if classifier == 'rfc':
-        cfr = RandomForestClassifier(n_estimators=2000, max_features='log2')
-    elif 'svm':
-        cfr = SVC()
+    train_x, train_y = data.get_train_set()
+    test_x, test_y = data.get_valid_set()
+    classifiers = {
+        '--rfc': RandomForestClassifier(n_estimators=2000, max_features='log2'),
+        '--svm': SVC()
+    }
+    try:
+        cfr = classifiers[classifier]
+    except KeyError:
+        print(' - Unknown classifier: {0}'.format(classifier))
+        sys.exit(-1)
 
     print(' - Fitting classifier')
     cfr.fit(train_x, train_y)
@@ -52,5 +61,5 @@ for i in range(iterations):
     acc_score = accuracy_score(test_y_pred, test_y)
     print(' - Test-set accuracy: {:5f}'.format(acc_score))
     mean_acc += acc_score
-mean_acc /= iterations
+mean_acc /= folds
 print('Average accuracy: {:5f}'.format(mean_acc))

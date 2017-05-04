@@ -75,18 +75,18 @@ with tf.Session() as sess:
     steps = 2001
     print('Iteration | Valid loss | Valid acc  | Test loss  | Test acc   ')
     for i in range(steps):
-        b_x, b_y = data.next_batch()
-        if i % fold == 0:
-            v_acc = sess.run(accuracy, feed_dict={x: b_x, y: b_y, dim: len(b_x)})
-            v_lss = sess.run(cost, feed_dict={x: b_x, y: b_y, dim: len(b_x)})
-            t_acc = sess.run(accuracy, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
-            t_lss = sess.run(cost, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
-            v_lss_hist.append(v_lss)
-            t_lss_hist.append(t_lss)
-            print('{0:9} |   {1:.6f} |   {2:.6f} |   {3:.6f} |    {4:.6f}'.format(i, v_lss, v_acc, t_lss, t_acc))
-        else:
-            if model != MAX:
-                sess.run(optimizer, feed_dict={x: b_x, y: b_y})
+        train_x, train_y = data.get_train_set()
+        sess.run(optimizer, feed_dict={x: train_x, y: train_y})
+
+        test_x, test_y = data.get_train_set()
+        v_acc = sess.run(accuracy, feed_dict={x: test_x, y: test_y, dim: len(test_x)})
+        v_lss = sess.run(cost, feed_dict={x: test_x, y: test_y, dim: len(test_x)})
+        t_acc = sess.run(accuracy, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
+        t_lss = sess.run(cost, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
+        v_lss_hist.append(v_lss)
+        t_lss_hist.append(t_lss)
+        print('{0:9} |   {1:.6f} |   {2:.6f} |   {3:.6f} |    {4:.6f}'.format(i, v_lss, v_acc, t_lss, t_acc))
+
 
 # Plot validation set and test set loss over epochs
 x_r = range(0, 2001, 10)
