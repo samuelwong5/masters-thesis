@@ -3,6 +3,7 @@ from random import shuffle
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
+from sklearn.metrics import roc_auc_score
 import sys
 
 from util import DataReader, partition_data, CrossValidation
@@ -36,11 +37,11 @@ def part(x, y):
     return train_x, train_y, test_x, test_y
 
 mean_acc = 0.0
-folds = 5
+folds = 10
 data = CrossValidation(x, y, folds)
 
 for i in range(folds):
-    print('[Iteration {0:2d}]'.format(i))
+    print('[Iteration {0:2d}]'.format(i+1))
     print(' - Shuffling data')
     train_x, train_y = data.get_train_set()
     test_x, test_y = data.get_valid_set()
@@ -60,6 +61,7 @@ for i in range(folds):
     test_y_pred = cfr.predict(test_x)
     acc_score = accuracy_score(test_y_pred, test_y)
     print(' - Test-set accuracy: {:5f}'.format(acc_score))
+    print(' - AUC: {:5f}'.format(roc_auc_score(test_y_pred, test_y)))
     mean_acc += acc_score
 mean_acc /= folds
 print('Average accuracy: {:5f}'.format(mean_acc))

@@ -66,6 +66,142 @@ loadAE_63063 = function() {
   write.csv(all_iSiC, file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined.csv")
 }
 
+test_this = function() {
+  require(R.utils);
+  require(data.table);
+  require(pracma);
+  
+  dataset <- "E-GEOD-84422";
+  folder <- paste("C:/Users/cwong/masters-thesis/data", dataset, sep="/");
+  
+  adf <- "A-AFFY-33.adf.txt";
+  adf <- paste(folder, adf, sep="/");
+  adf_data <- read.table(file = adf,
+                         header = TRUE,
+                         sep = ",",
+                         fill = TRUE,
+                         na.strings = "");
+
+  samples_dir <- paste(folder, "samples", sep="/")
+  samples_files <- sapply(list.files(samples_dir),
+                          function(x) { 
+                            paste(samples_dir, x, sep="/") 
+                          });
+  
+  library( org.Hs.eg.db );
+  entrez_table <- as.list( org.Hs.egREFSEQ2EG );
+  
+  combined <- NULL;
+  
+  for (i in 1:length(samples_files)) {
+    data <- read.table(file = samples_files[i],
+                       header = TRUE, 
+                       sep = "\t",
+                       na.strings = "");
+    probe_ids <- data[, 1];
+    
+    # Match sample probes with Refseq IDs
+    probe_matches <- match(probe_ids, adf_data[, 1]);
+
+    
+    # Strip all non-existing refseq rows
+    probe_entrez <- adf_data[probe_matches, "Composite.Element.Database.Entry.refseq."];
+    data <- data[!is.na(probe_entrez), ];
+    probe_entrez <- probe_entrez[!is.na(probe_entrez)];
+  
+    
+    # Unique Refseq IDs
+    probe_entrez_u <- unique(probe_entrez);
+    u <- match(probe_entrez_u, probe_entrez);
+    data <- data[u, 2, drop=FALSE];
+    
+    dimnames(data)[[1]] <- probe_entrez_u;
+    dimnames(data)[[2]] <- c(samples_files[i]);
+    
+    if (dim(data)[[1]] > 0) {
+      if (is.null(combined)) {
+        combined <- data;
+      } else {
+        d_a <- dimnames(combined)[[1]];
+        d_b <- dimnames(data)[[1]];
+        m_a <- match(d_a, d_b);
+        m_b <- match(d_b, d_a);
+        combined <- combined[!is.na(m_a), , drop=FALSE];
+        data <- data[!is.na(m_b), , drop=FALSE];
+        combined[,samples_files[i]] <- data[, 1];
+        # <- merge(combined, data, by="row.names");
+        #combined["Row.names"] <- NULL;
+      }
+    }
+  }
+  return(combined);
+  
+}
+
+loadAE_84422 = function(){
+  # Postmortem brain in AD. 250 people
+  
+  # Some libs
+  require( R.utils );
+  require( data.table );
+  require( pracma );
+  
+  # Hale the user
+  print( paste(match.call()[1]," = Loading data from ArrayExpress GEOD84422's. ",sep="") );
+  
+  # Get gene expression files
+  expression_iGiS <- getPreprocessedFiles( folder = "C:/Users/cwong/masters-thesis/data/E-GEOD-84422/samples",
+                                           nameColum = "ID_REF",
+                                           expColum = "VALUE" );
+  
+  # Change the dimention names into RefSeq names
+  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
+  expression_e_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
+                                         fileADF = "C:/Users/cwong/masters-thesis/data/E-GEOD-84422/A-AFFY-33.adf.txt",
+                                         columnName = "Composite.Element.Database.Entry.refseq." );
+  
+  # Change gene names from RefSeq into Entrez
+  library( org.Hs.eg.db );
+  entrez_iG <- as.list( org.Hs.egREFSEQ2EG );
+  iGs_exist <- names( entrez_iG ) %in% dimnames( expression_e_iGiS )[[1]];
+  entrez_iG <- entrez_iG[ iGs_exist ]; 
+  entrez_iG <- unlist( entrez_iG );
+  expression_te_iGiS <- expression_e_iGiS[ names( entrez_iG ), ];
+  dimnames( expression_te_iGiS )[[1]] <- entrez_iG;
+  
+  # Save stuff
+  save( file = "loadAE_E-GEOD-48350_security.Rdata", list = c( "expression_te_iGiS" ) );
+  rm( expression_iGiS );
+  rm( expression_e_iGiS );
+  
+  # Get demographics
+  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
+  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_te_iGiS, 
+                                             factorName_sdrf_iF = c( "Term.Source.REF.", 
+                                                                     "Comment..Sample.Table.", 
+                                                                     "ad"), 
+                                             factorName_iF = c( "brainRegion", "age", "gender", "ad" ), 
+                                             fileSDRF = "C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350.sdrf.txt" );
+  demographics_iSiC[ ,"age"] <- sapply( demographics_iSiC[ ,"age"],
+                                        function( s ){
+                                          return( strsplit( s, " ")[[1]][1] );
+                                        } );
+  demographics_iSiC[ demographics_iSiC[ ,"age"] == ">90", "age" ] <- 90;
+  
+  
+  # Put all data together
+  stopifnot( all( dimnames( demographics_iSiC )[[1]] %in% dimnames( expression_te_iGiS )[[2]] ) );
+  all_iSiC <- as.data.frame( t( expression_te_iGiS ) );
+  all_iSiC <- cbind( demographics_iSiC,
+                     all_iSiC[ dimnames( demographics_iSiC )[[1]], ] );
+  all_iSiC$age <- as.numeric( as.character( all_iSiC$age ) );
+  
+  # Return
+  return( all_iSiC );
+  
+}
+
+
 loadAE_48350 = function(){
   # Postmortem brain in AD. 250 people
   
@@ -78,14 +214,14 @@ loadAE_48350 = function(){
   print( paste(match.call()[1]," = Loading data from ArrayExpress GEOD48350's. ",sep="") );
   
   # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "C:/Users/alejon/Documents/samuel/masters/data/E-GEOD-48350/samples",
+  expression_iGiS <- getPreprocessedFiles( folder = "C:/Users/alejon/Documents/samuel/masters/data/E-GEOD-84422/samples",
                                            nameColum = "ID_REF",
                                            expColum = "VALUE" );
   
   # Change the dimention names into RefSeq names
   print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
   expression_e_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                         fileADF = "C:/Users/alejon/Documents/samuel/masters/data/E-GEOD-48350/A-AFFY-44.adf.txt",
+                                         fileADF = "C:/Users/alejon/Documents/samuel/masters/data/E-GEOD-84422/A-AFFY-44.adf.txt",
                                          columnName = "Composite.Element.Database.Entry.refseq." );
   
   # Change gene names from RefSeq into Entrez
@@ -194,622 +330,6 @@ loadAE_hamill = function(){
   
 }
 
-loadAE_zhu = function(){
-  # Postmortem brain in AD. 250 people
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  require( pracma );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Zhu's. ",sep="") );
-  
-  # Get gene expression files
-  expression_1_iGiS <- getPreprocessedFiles( folder = "G:/Project EMIF/AEdata/Zhu4372/E-GEOD-44772.processed.1",
-                                             nameColum = "Reporter.Identifier",
-                                             expColum = "VALUE" );
-  expression_2_iGiS <- getPreprocessedFiles( folder = "G:/Project EMIF/AEdata/Zhu4372/E-GEOD-44772.processed.2",
-                                             nameColum = "Reporter.Identifier",
-                                             expColum = "VALUE" );
-  stopifnot( all( dimnames( expression_1_iGiS )[[1]] == dimnames( expression_2_iGiS )[[1]] ) );
-  expression_iGiS <- cbind( expression_1_iGiS,
-                            expression_2_iGiS );
-  
-  # Change the dimention names into RefSeq names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_e_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                         fileADF = "G:/Project EMIF/AEdata/Zhu4372/A-GEOD-4372.adf_cut.txt",
-                                         columnName = "Reporter.Database.Entry..genbank." );
-  
-  # Change gene names from RefSeq into Entrez
-  library( org.Hs.eg.db );
-  entrez_iG <- as.list( org.Hs.egREFSEQ2EG );
-  iGs_exist <- names( entrez_iG ) %in% dimnames( expression_e_iGiS )[[1]];
-  entrez_iG <- entrez_iG[ iGs_exist ]; 
-  entrez_iG <- unlist( entrez_iG );
-  expression_te_iGiS <- expression_e_iGiS[ names( entrez_iG ), ];
-  dimnames( expression_te_iGiS )[[1]] <- entrez_iG;
-  
-  # Save stuff
-  save( file = "loadAE_zhu_security.Rdata", list = c( "expression_te_iGiS" ) );
-  rm( expression_iGiS );
-  rm( expression_e_iGiS );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_te_iGiS, 
-                                             factorName_sdrf_iF = c( "Comment..Sample_description.", 
-                                                                     "Characteristics..age.", 
-                                                                     "Characteristics..disease.status.",
-                                                                     "Characteristics..sex." ), 
-                                             factorName_iF = c( "brainReion", 
-                                                                "age", 
-                                                                "ad", 
-                                                                "gender" ), 
-                                             fileSDRF = "G:/Project EMIF/AEdata/Zhu4372/E-GEOD-44772.sdrf.txt",
-                                             nameExtension = "2" );
-  
-  # Put all data together
-  stopifnot( all( dimnames( demographics_iSiC )[[1]] %in% dimnames( expression_te_iGiS )[[2]] ) );
-  all_iSiC <- as.data.frame( t( expression_te_iGiS ) );
-  all_iSiC <- cbind( demographics_iSiC,
-                     all_iSiC[ dimnames( demographics_iSiC )[[1]], ] );
-  all_iSiC$age <- as.numeric( as.character( all_iSiC$age ) );
-  
-  # Return
-  return( all_iSiC );
-  
-}
-
-loadAE_berchtold = function(){
-  # Postmortem brain in AD. 250 people
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  require( pracma );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Berchtold's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "G:/Project EMIF/AEdata/Berchtold48350/E-GEOD-48350.processed.1",
-                                           nameColum = "ID_REF",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into RefSeq names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_e_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                         fileADF = "G:/Project EMIF/AEdata/Berchtold48350/A-AFFY-44.adf.csv",
-                                         columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Change gene names from RefSeq into Entrez
-  library( org.Hs.eg.db );
-  entrez_iG <- as.list( org.Hs.egREFSEQ2EG );
-  iGs_exist <- names( entrez_iG ) %in% dimnames( expression_e_iGiS )[[1]];
-  entrez_iG <- entrez_iG[ iGs_exist ]; 
-  entrez_iG <- unlist( entrez_iG );
-  expression_te_iGiS <- expression_e_iGiS[ names( entrez_iG ), ];
-  dimnames( expression_te_iGiS )[[1]] <- entrez_iG;
-    
-  # Save stuff
-  save( file = "loadAE_berchtold_security.Rdata", list = c( "expression_te_iGiS" ) );
-  rm( expression_iGiS );
-  rm( expression_e_iGiS );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_te_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics..age.yrs.", 
-                                                                     "Characteristics..apoe.genotype.", 
-                                                                     "Characteristics..braak.stage.",
-                                                                     "Characteristics..brain.region.",
-                                                                     "Comment..Sample_title."), 
-                                             factorName_iF = c( "age", "apoe", "braak", "brainRegion", "gender" ), 
-                                             fileSDRF = "G:/Project EMIF/AEdata/Berchtold48350/E-GEOD-48350.sdrf.txt" );
-  demographics_iSiC <- cbind( demographics_iSiC,
-                              ad = demographics_iSiC[ ,"braak"] == "  " );
-  demographics_iSiC[ ,"gender"] <- sapply( demographics_iSiC[ ,"gender"],
-                                           function( s ){
-                                             if( grepl( "female",
-                                                       s,
-                                                       fixed = TRUE ) ){
-                                               return( "female" );
-                                             }else{
-                                               return( "male" );
-                                             }
-                                           } );
-  stopifnot( sum( demographics_iSiC[ ,"ad"] == "TRUE" ) > 100 );
-  stopifnot( sum( demographics_iSiC[ ,"gender"] == "female" ) > 100 );
-  stopifnot( sum( demographics_iSiC[ ,"gender"] == "male" ) > 100 );
-  
-  # Put all data together
-  stopifnot( all( dimnames( demographics_iSiC )[[1]] %in% dimnames( expression_te_iGiS )[[2]] ) );
-  all_iSiC <- as.data.frame( t( expression_te_iGiS ) );
-  all_iSiC <- cbind( demographics_iSiC,
-                     all_iSiC[ dimnames( demographics_iSiC )[[1]], ] );
-  all_iSiC$age <- as.numeric( as.character( all_iSiC$age ) );
-  
-  # Return
-  return( all_iSiC );
-  
-}
-
-loadAE_luk = function( ){
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Lek's. ",sep="") );
-  
-  # Get gene expression files
-  #expression_iGiS <- read.csv( file = "G:/Project WT-Inf/Data/AE Luk 185/E-TABM-185.processed.csv",
-  names_i1iS <- read.csv( file = "G:/Project WT-Inf/Data/AE Luk 185/E-TABM-185.processed.2/E-TABM-185.processed.txt",
-                          row.names = 1,
-                          nrows = 1,
-                          header = FALSE,
-                          sep = "\t",
-                          stringsAsFactors = FALSE );
-  expression_iGiS <- read.csv( file = "G:/Project WT-Inf/Data/AE Luk 185/E-TABM-185.processed.2/E-TABM-185.processed.txt",
-                               row.names = 1,
-                               skip = 1,
-                               sep = "\t" ); #nrows = 10000 );
-  stopifnot( dim( names_i1iS )[2] == dim( expression_iGiS )[2] );
-  dimnames( expression_iGiS )[[2]] <- as.character( names_i1iS );
-  expression_iGiS <- as.matrix( expression_iGiS );
-  expression_iGiS <- as.array( expression_iGiS );
-  dimnames( expression_iGiS )[[2]] <- sapply( dimnames( expression_iGiS )[[2]], 
-                                              function( s ){ 
-                                                substr( s, 1, nchar(s)-4 ); 
-                                              } );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "G:/Project WT-Inf/Data/AE Luk 185/A-AFFY-33.adf_cut.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_luk_security.Rdata", 
-        list = c( "expression_iGiS" ) );
-  
-  # Return results
-  return( expression_iGiS );
-  
-  
-}
-
-loadAE_johannes = function(){
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Ivan's. ",sep="") );
-  
-  # Get gene expression files
-  expression23_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Johannes 13691/E-GEOD-13691.processed.1",
-                                            nameColum = "ID_REF",
-                                            expColum = "VALUE" );
-  expression24_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Johannes 13691/E-GEOD-13691.processed.2",
-                                            nameColum = "ID_REF",
-                                            expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression23_iGiS <- getGeneNames_ADF( expression_iGiS = expression23_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Johannes 13691/A-AFFY-23.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  expression24_iGiS <- getGeneNames_ADF( expression_iGiS = expression24_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Johannes 13691/A-AFFY-24.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Merge
-  iGs <- unique( c( dimnames( expression23_iGiS )[[1]], dimnames( expression24_iGiS )[[1]] ) );
-  iG_iG23 <- match( dimnames( expression23_iGiS )[[1]], iGs );
-  iG_iG24 <- match( dimnames( expression24_iGiS )[[1]], iGs );
-  expression_iGiS <- array( data = NA, dim = c( length( iGs ), dim( expression23_iGiS )[2] + dim( expression24_iGiS )[2] ) );
-  expression_iGiS[ iG_iG23, 1:dim( expression23_iGiS )[2] ] <- expression23_iGiS;
-  expression_iGiS[ iG_iG24, dim( expression23_iGiS )[2] + ( 1:dim( expression24_iGiS )[2] ) ] <- expression24_iGiS;
-  dimnames( expression_iGiS )[[1]] <- iGs;
-  dimnames( expression_iGiS )[[2]] <- c( dimnames( expression23_iGiS )[[2]], dimnames( expression24_iGiS )[[2]] );
-  
-  # Save stuff
-  save( file = "loadAE_johannes_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "status" ), 
-                                             factorName_iF = c( "status" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Johannes 13691/E-GEOD-13691.sdrf.txt" );
-  
-  # Tidy demographics up a bit
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "transgenic for Ubb+1" ,"status"] <- "Ubb+1";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "wildtype" ,"status"] <- "wild";
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyemyung" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_ivan = function(){
-  # AD11 mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Ivan's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Ivan 63617/E-GEOD-63617.processed.1",
-                                           nameColum = "Reporter.Identifier",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Ivan 63617/A-MEXP-724.adf.txt",
-                                       columnName = "Reporter.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_hyemyung_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics..age.", 
-                                                                     "Characteristics..genotype.", 
-                                                                     "Characteristics..organism.part." ), 
-                                             factorName_iF = c( "age", "status", "tissue" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Ivan 63617/E-GEOD-63617.sdrf.txt" );
-  
-  # Tidy demographics up a bit
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "AD11 anti-NGF transgenic mouse" ,"status"] <- "AD11";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "wildtype" ,"status"] <- "wild";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "VH transgenic mouse" ,"status"] <- "VH";
-  demographics_iSiC[ demographics_iSiC[ ,"tissue"] == "pool of whole brain from 2 mice" ,"tissue"] <- "brain"; 
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyemyung" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_phillip = function(){
-  # Tg2576 mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Phillip's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Phillip 36237/E-GEOD-36237.processed.1",
-                                           nameColum = "ID_REF",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Phillip 36237/A-AFFY-45.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_hyemyung_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics.age.", 
-                                                                     "Characteristics.variation.", 
-                                                                     "Characteristics.organism.part.",
-                                                                     "Characteristics.treated.with."), 
-                                             factorName_iF = c( "age", "status", "tissue", "extraTreatment" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Phillip 36237/E-GEOD-36237.sdrf.txt" );
-  
-  # Tidy demographics up a bit
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "Tg+ (over-expressing human mutant amyloid precursor protein)" ,"status"] <- "Tg2576";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "Tg- (non-transgenic WT littermates)" ,"status"] <- "wild";
-  cutName <- function(x) { iX_start <- 1;
-                           iX_end <- regexpr( " ", x, fixed=TRUE )[1];
-                           return( substr( x, iX_start, iX_end-1 ) ); };
-  demographics_iSiC[ ,"extraTreatment"] <- sapply( demographics_iSiC[ ,"extraTreatment"], cutName );  
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyemyung" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_giovanni = function(){
-  # APP mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Giovanni's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- read.table( file = "F:/Project DKK1/programsR_it1/Data/Giovanni 14499/E-GEOD-14499.processed.1/E-GEOD-14499-processed-data-1721514524.txt",
-                                 header = TRUE, 
-                                 sep = "\t");
-  expression_iGiS <- as.matrix( expression_iGiS );
-  expression_iGiS <- as.array( expression_iGiS );
-  dimnames( expression_iGiS )[[1]] <- expression_iGiS[ ,1];
-  dimnames( expression_iGiS )[[2]] <- sapply( dimnames( expression_iGiS )[[2]], function( s ){ substr( s, 1, nchar(s)-4 ); });
-  expression_iGiS <- expression_iGiS[-1,-1];
-  expression2_iGiS <- as.numeric( expression_iGiS );
-  dim( expression2_iGiS ) <- dim( expression_iGiS );
-  dimnames( expression2_iGiS ) <- dimnames( expression_iGiS );
-  expression_iGiS <- expression2_iGiS;
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Giovanni 14499/A-AFFY-45.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_giovanni_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  dimnames( expression_iGiS )[[2]] <- paste( "GSE14499", dimnames( expression_iGiS )[[2]], sep = "" );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Comment..Sample_characteristics.", "Comment..Sample_characteristics.", "Comment..Sample_characteristics." ), 
-                                             factorName_iF = c( "status", "tissue", "extraTreatment" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Giovanni 14499/E-GEOD-14499.sdrf.healed.txt" );
-  
-  # Polish the demographics of these guys
-  cutName <- function(x) { iX_start <- regexpr( "Genotype: ", x, fixed=TRUE )[1] + 10;
-                           iX_end <- regexpr( "; Treatment:", x, fixed=TRUE )[1];
-                           return( substr( x, iX_start, iX_end-1 ) ); };
-  demographics_iSiC[ ,"status"] <- sapply( demographics_iSiC[ ,"status"], cutName );
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "APP" ,"status"] <- "J20";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "non-transgenic" ,"status"] <- "wild";
-  cutName <- function(x) { iX_start <- regexpr( "Region: ", x, fixed=TRUE )[1] + 8;
-                           iX_end <- regexpr( "; Genotype:", x, fixed=TRUE )[1];
-                           return( substr( x, iX_start, iX_end ) ); };
-  demographics_iSiC[ ,"tissue"] <- sapply( demographics_iSiC[ ,"tissue"], cutName );
-  cutName <- function(x) { iX_start <- regexpr( "Treatment: ", x, fixed=TRUE )[1] + 11;
-                           iX_end <- nchar( x );
-                           return( substr( x, iX_start, iX_end ) ); };
-  demographics_iSiC[ ,"extraTreatment"] <- sapply( demographics_iSiC[ ,"extraTreatment"], cutName );
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyemyung" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_hyemyung2 = function(){
-  # Tg6799 mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Hyemyung's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Hyemung2 52022/E-GEOD-52022.processed.1",
-                                           nameColum = "ID_REF",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Hyemung2 52022/A-AFFY-45.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_hyemyung2_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics..age.", "Characteristics..genotype.", "Characteristics..organism.part." ), 
-                                             factorName_iF = c( "age", "status", "tissue" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Hyemung2 52022/E-GEOD-52022.sdrf.txt" );
-  
-  # Fix demographics
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "AD mutant" ,"status"] <- "5xFAD";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "littermate" ,"status"] <- "wild";
-  demographics_iSiC[ demographics_iSiC[ ,"tissue"] == "Brain Hippocampus" ,"tissue"] <- "hippocampus";
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyemyung" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_hyemyung = function(){
-  # Tg6799 mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Hyemyung's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Hyemyung 52024/E-GEOD-52024.processed.1",
-                                           nameColum = "ID_REF",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Hyemyung 52024/A-AFFY-45.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_hyemyung_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics..age.", "Characteristics..genotype.", "Characteristics..organism.part." ), 
-                                             factorName_iF = c( "age", "status", "tissue" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Hyemyung 52024/E-GEOD-52024.hyb.sdrf.txt" );
-  
-  # Fix demographics
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "AD mutant" ,"status"] <- "5xFAD";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "littermate" ,"status"] <- "wild";
-  demographics_iSiC[ demographics_iSiC[ ,"tissue"] == "Brain Hippocampus" ,"tissue"] <- "hippocampus";
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyemyung" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_hyslop = function(){
-  # TgCRND8  mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Becker's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Hyslop 31372/E-GEOD-31372.processed.1",
-                                           nameColum = "ID_REF",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Hyslop 31372/A-AFFY-45.adf.txt",
-                                       columnName = "Composite.Element.Database.Entry.refseq." );
-  
-  # Save stuff
-  save( file = "loadAE_hyslop_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics..age.", "Characteristics..genetic.background.", "Characteristics..organism.part." ), 
-                                             factorName_iF = c( "age", "status", "tissue" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Hyslop 31372/E-GEOD-31372.sdrf_healed.txt" );
-  
-  # Fix demographics
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "TgCRND8 transgenic mouse" ,"status"] <- "TgCRND8";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "non-transgenic littermate mouse" ,"status"] <- "wild";
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_hyslop" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
-
-loadAE_becker = function(){
-  # 3xTgAD mice model
-  
-  # Some libs
-  require( R.utils );
-  require( data.table );
-  
-  # Hale the user
-  print( paste(match.call()[1]," = Loading data from ArrayExpress Becker's. ",sep="") );
-  
-  # Get gene expression files
-  expression_iGiS <- getPreprocessedFiles( folder = "F:/Project DKK1/programsR_it1/Data/Becker 60911/E-GEOD-60911.processed.1",
-                                           nameColum = "Reporter.Identifier",
-                                           expColum = "VALUE" );
-  
-  # Change the dimention names into Entrez names
-  print( paste(match.call()[1]," = Loading gene names.  ",sep="") );
-  expression_iGiS <- getGeneNames_ADF( expression_iGiS = expression_iGiS, 
-                                       fileADF = "F:/Project DKK1/programsR_it1/Data/Becker 60911/A-MEXP-1174.adf_cut.txt",
-                                       columnName = "Reporter.Database.Entry.refseq." );
-                                       #columnName = "Reporter.Database.Entry.hugo." );
-  
-  # Save stuff
-  save( file = "loadAE_becker_security.Rdata", list = c( "expression_iGiS" ) );
-  
-  # Get demographics
-  print( paste(match.call()[1]," = Loading demographics. ",sep="") );
-  demographics_iSiC <- getDemographics_SDRF( expression_iGiS = expression_iGiS, 
-                                             factorName_sdrf_iF = c( "Characteristics..genotype.", "Characteristics..organism.part.", "Characteristics..genotype."), 
-                                             factorName_iF = c( "status", "tissue", "extraTreatment" ), 
-                                             fileSDRF = "F:/Project DKK1/programsR_it1/Data/Becker 60911/E-GEOD-60911.sdrf.txt" );
-  # Fix demographics
-  demographics_iSiC[ ,"status"] <- sapply( demographics_iSiC[ ,"status"], function( s ) { substr( s, 1, 4 );} );
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "3XTG" ,"status"] <- "3xTg";
-  demographics_iSiC[ demographics_iSiC[ ,"status"] == "POLB" ,"status"] <- "wild";
-  demographics_iSiC[ ,"extraTreatment"] <- sapply( demographics_iSiC[ ,"extraTreatment"], function( s ) { substr( s, nchar(s)-6, nchar(s) );} );
-  demographics_iSiC[ demographics_iSiC[ ,"extraTreatment"] == "ld type" ,"extraTreatment"] <- "none";  
-  
-  # Put everything into a DataVST structure
-  data <- DataVST$new();
-  data$meaningDimV_c <- meaningDimV$GENE_EXPRESSION;
-  data$history_jHiC <- list( "loadAE_becker" );
-  data$setValue( expression_iGiS );
-  data$demographics_iSiC <- demographics_iSiC;
-  
-  # Return
-  return( data );
-  
-}
 
 getRawFiles = function( folder ){
   

@@ -25,7 +25,7 @@ n_hidden_1 = 2048
 n_hidden_2 = 128
 n_classes = 2
 fold = 10 # Cross validation
-learning_rate = 0.01
+learning_rate = 1
 dropout_prob = 0.5 # keep_prob = 1 - dropout_prob
 
 # Read and parse input data
@@ -59,8 +59,14 @@ if model == MAX:
 elif model == FFNN:
     pred = model(x, weights, biases, keep_prob=1-dropout_prob)
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
+
+global_step = tf.Variable(0, trainable=False)
+starter_learning_rate = 1.0
+learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step,
+                                           50, 0.5, staircase=False)
 if model != MAX:
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+
 correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
@@ -72,11 +78,11 @@ t_lss_hist = []
 # Train
 with tf.Session() as sess:
     sess.run(init)
-    steps = 2001
+    steps = 200
     print('Iteration | Valid loss | Valid acc  | Test loss  | Test acc   ')
     for i in range(steps):
         train_x, train_y = data.get_train_set()
-        sess.run(optimizer, feed_dict={x: train_x, y: train_y})
+        sess.run(optimizer, feed_dict={x: train_x, y: train_y, global_step: i})
 
         test_x, test_y = data.get_train_set()
         v_acc = sess.run(accuracy, feed_dict={x: test_x, y: test_y, dim: len(test_x)})
@@ -85,11 +91,11 @@ with tf.Session() as sess:
         t_lss = sess.run(cost, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
         v_lss_hist.append(v_lss)
         t_lss_hist.append(t_lss)
-        print('{0:9} |   {1:.6f} |   {2:.6f} |   {3:.6f} |    {4:.6f}'.format(i, v_lss, v_acc, t_lss, t_acc))
+        print('{0:9} |   {1:2.5f} |   {2:2.5f} |   {3:2.5f} |    {4:2.4f}'.format(i, v_lss, v_acc, t_lss, t_acc))
 
 
 # Plot validation set and test set loss over epochs
-x_r = range(0, 2001, 10)
+x_r = range(0, 200)
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
 ax1.scatter(x_r, v_lss_hist, label='Validation loss')
