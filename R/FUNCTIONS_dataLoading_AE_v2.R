@@ -66,39 +66,69 @@ loadAE_63063 = function() {
   write.csv(all_iSiC, file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined.csv")
 }
 
-test_this = function() {
+
+pretty_print_progress = function(text, curr, total) {
+  cat(paste("\r", text, ": ", curr, "/", total, sep=""));
+}
+
+# Loads data from ArrayExpress
+#   Preconditions
+#     - Folder structure:
+#         folder/
+#           |----samples/
+#           |      |----source_1_sample_table.txt
+#           |      |----source_2_sample_table.txt
+#           |     ...
+#           |      |----source_n_sample_table.txt
+#           |----dataset.sdrf.txt
+#           |----chip.adf.txt
+#
+#   Parameters
+#     folder     - top level folder (e.g. "C:/Users/user/data/E-GEOD-884422")
+#     dataset    - name of dataset (e.g. "E-GEOD-884422")
+#     funcs      - vector of functions to parse metadata from sdrf file
+#     adf        - filename of ADF file
+#     adf_sep    - delimiter in adf file
+#     sample_sep - delimiter in sample files
+#     sdrf_sep   - delimiter in sdrf file
+
+load_data = function(folder,
+                     dataset,
+                     funcs,
+                     adf,
+                     adf_sep=",",
+                     sample_sep=",",
+                     sdrf_sep=",") {
   require(R.utils);
   require(data.table);
   require(pracma);
   
-  dataset <- "E-GEOD-84422";
-  folder <- paste("C:/Users/cwong/masters-thesis/data", dataset, sep="/");
+  print(paste("Combining data from ", folder, sep=""));
+  samples_dir <- paste(folder, "samples", sep="/");
+  samples_files <- list.files(samples_dir);
+  print(paste("Number of samples detected: ", length(samples_files), sep=""))
   
-  adf <- "A-AFFY-33.adf.txt";
+  print("Reading ADF file")
   adf <- paste(folder, adf, sep="/");
   adf_data <- read.table(file = adf,
                          header = TRUE,
-                         sep = ",",
+                         sep = adf_sep,
                          fill = TRUE,
                          na.strings = "");
 
-  samples_dir <- paste(folder, "samples", sep="/")
-  samples_files <- sapply(list.files(samples_dir),
-                          function(x) { 
-                            paste(samples_dir, x, sep="/") 
-                          });
-  
   library( org.Hs.eg.db );
   entrez_table <- as.list( org.Hs.egREFSEQ2EG );
   
   combined <- NULL;
+  samples_count <- length(samples_files);
   
   for (i in 1:length(samples_files)) {
-    data <- read.table(file = samples_files[i],
+    pretty_print_progress("Processing sample files", i, samples_count);
+    data <- read.table(file = paste(samples_dir, samples_files[i], sep="/"),
                        header = TRUE, 
-                       sep = "\t",
+                       sep = sample_sep,
                        na.strings = "");
-    probe_ids <- data[, 1];
+    probe_ids <- data[, 1];is
     
     # Match sample probes with Refseq IDs
     probe_matches <- match(probe_ids, adf_data[, 1]);
@@ -129,13 +159,73 @@ test_this = function() {
         combined <- combined[!is.na(m_a), , drop=FALSE];
         data <- data[!is.na(m_b), , drop=FALSE];
         combined[,samples_files[i]] <- data[, 1];
-        # <- merge(combined, data, by="row.names");
-        #combined["Row.names"] <- NULL;
       }
+    }
+  }
+  
+  
+  
+  print("Converting gene identifiers into Entrez IDs");
+  library( org.Hs.eg.db );
+  entrez <- as.list( org.Hs.egREFSEQ2EG );
+  entrez_exist <- names( entrez ) %in% dimnames( combined )[[1]];
+  entrez <- entrez_iG[ entrez_exist ]; 
+  entrez <- unlist( entrez );
+  combined <- combined[names(entrez), ];
+  entrez_u <- unique(entrez);
+  u <- match(entrez_u, entrez);
+  combined <- combined[u, ];
+  dimnames(combined)[[1]] <- entrez_u;
+
+  
+  # Get patient data
+  sdrf_fp <- paste(folder, "/", dataset, ".sdrf.txt", sep="");
+  sdrf_data <- read.csv(file = sdrf_fp,
+                          header = TRUE,
+                          sep = sdrf_sep,
+                          fill = TRUE,
+                          na.strings = "");
+  dimnames(sdrf_data)[[1]] = sdrf_data[, 1];
+
+  c_dim <- dim(combined)[[1]];
+  
+  for (i in 1:dim(combined)[2]) {
+    
+    pretty_print_progress("Getting metadata from SDRF file", i, samples_count);
+    metadata <- sdrf_data[paste(strsplit(dimnames(combined)[[2]][i], "_")[[1]][1], " 1", sep=""), ];
+    for (j in 1:length(funcs)) {
+      combined[c_dim + j, i] <- funcs[[j]](metadata);
     }
   }
   return(combined);
   
+}
+
+test = function() {
+  funcs = c(
+    function(x) {   # Gender
+      if (as.character(x[["Term.Accession.Number"]]) == "female") {
+        return(0);
+      } 
+      return(1);
+    },
+    function(x) {   # AGE
+      return(strsplit(as.character(x[["Comment..Sample_title."]]), " ")[[1]][2]);
+    },
+    function(x) {   # AD
+      return(switch(as.character(x[["ad"]]), normal=0, 1));
+    }
+  )
+  data = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-84422",
+                   "E-GEOD-84422",
+                   funcs,
+                   "A-AFFY-33.adf.txt",
+                   adf_sep=",",
+                   sample_sep="\t",
+                   sdrf_sep=",")
+  data.t <- t(data[,1:ncol(data)]);
+  rm(data);
+  return(data.t);
 }
 
 loadAE_84422 = function(){

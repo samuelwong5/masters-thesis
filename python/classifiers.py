@@ -19,7 +19,8 @@ except:
 iterations = 1 if len(sys.argv) < 3 else int(sys.argv[2])
 
 
-fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
+#fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
+fp = '../data/E-GEOD-84422/E-GEOD-84422-combined2.csv'
 #fp = '../data/E-GEOD-63063/E-GEOD-63063-combined.csv'
 
 print('Reading file')
