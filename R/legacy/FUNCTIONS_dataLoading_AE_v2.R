@@ -69,6 +69,9 @@ loadAE_63063 = function() {
 
 pretty_print_progress = function(text, curr, total) {
   cat(paste("\r", text, ": ", curr, "/", total, sep=""));
+  if (curr == total) {
+    cat("\n");
+  }
 }
 
 # Loads data from ArrayExpress
@@ -122,7 +125,7 @@ load_data = function(folder,
   combined <- NULL;
   samples_count <- length(samples_files);
   
-  for (i in 1:length(samples_files)) {
+  for (i in 1:samples_count) {
     pretty_print_progress("Processing sample files", i, samples_count);
     data <- read.table(file = paste(samples_dir, samples_files[i], sep="/"),
                        header = TRUE, 
@@ -169,12 +172,13 @@ load_data = function(folder,
   library( org.Hs.eg.db );
   entrez <- as.list( org.Hs.egREFSEQ2EG );
   entrez_exist <- names( entrez ) %in% dimnames( combined )[[1]];
-  entrez <- entrez_iG[ entrez_exist ]; 
+  entrez <- entrez[ entrez_exist ]; 
   entrez <- unlist( entrez );
   combined <- combined[names(entrez), ];
   entrez_u <- unique(entrez);
   u <- match(entrez_u, entrez);
   combined <- combined[u, ];
+
   dimnames(combined)[[1]] <- entrez_u;
 
   
@@ -197,35 +201,68 @@ load_data = function(folder,
       combined[c_dim + j, i] <- funcs[[j]](metadata);
     }
   }
-  return(combined);
+  data <- t(combined[,1:ncol(combined)]);
+  rm(combined);
+  return(data);
   
 }
 
 test = function() {
-  funcs = c(
-    function(x) {   # Gender
-      if (as.character(x[["Term.Accession.Number"]]) == "female") {
+  if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv")) {
+    #84422
+    funcs_84422 = c(
+      function(x) {   # Gender
+        if (as.character(x[["Term.Accession.Number"]]) == "female") {
+          return(0);
+        } 
+        return(1);
+      },
+      function(x) {   # AGE
+        return(strsplit(as.character(x[["Comment..Sample_title."]]), " ")[[1]][2]);
+      },
+      function(x) {   # AD
+        return(switch(as.character(x[["ad"]]), normal=0, 1));
+      }
+    )
+    data_84422 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-84422",
+                     "E-GEOD-84422",
+                     funcs_84422,
+                     "A-AFFY-33.adf.txt",
+                     adf_sep=",",
+                     sample_sep="\t",
+                     sdrf_sep=",")
+    write.csv(data_84422, file="C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv");
+  }
+  
+  
+  if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv")) {
+    # 48350
+    funcs_48350 = c(
+      function(x) {   # Gender
+        if (as.character(x[["Characteristics..sex."]]) == "female") {
+          return(0);
+        } 
+        return(1);
+      },
+      function(x) {   # AGE
+        return(strsplit(as.character(x[["Characteristics..age.yrs."]]), " ")[[1]][2]);
+      },
+      function(x) {   # AD
+        if (x[["Characteristics..braak.stage."]] > 0) {
+          return(1);
+        }
         return(0);
-      } 
-      return(1);
-    },
-    function(x) {   # AGE
-      return(strsplit(as.character(x[["Comment..Sample_title."]]), " ")[[1]][2]);
-    },
-    function(x) {   # AD
-      return(switch(as.character(x[["ad"]]), normal=0, 1));
-    }
-  )
-  data = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-84422",
-                   "E-GEOD-84422",
-                   funcs,
-                   "A-AFFY-33.adf.txt",
-                   adf_sep=",",
-                   sample_sep="\t",
-                   sdrf_sep=",")
-  data.t <- t(data[,1:ncol(data)]);
-  rm(data);
-  return(data.t);
+      }
+    )
+    data_48350= load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-48350",
+                           "E-GEOD-48350",
+                           funcs_48350,
+                           "A-AFFY-44.adf.txt",
+                           adf_sep="\t",
+                           sample_sep="\t",
+                           sdrf_sep=",")
+    write.csv(data_48350, file="C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv");
+  }
 }
 
 loadAE_84422 = function(){
