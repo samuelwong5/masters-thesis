@@ -1,0 +1,53 @@
+Reading file
+Creating Cross-validation tool
+[Iteration  1]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.990826
+ - AUC: 0.994253
+[Iteration  2]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.972477
+ - AUC: 0.916667
+[Iteration  3]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.981651
+ - AUC: 0.944444
+[Iteration  4]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.963303
+ - AUC: 0.915497
+[Iteration  5]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 1.000000
+ - AUC: 1.000000
+[Iteration  6]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.981651
+ - AUC: 0.956522
+[Iteration  7]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.981651
+ - AUC: 0.961538
+[Iteration  8]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.972477
+ - AUC: 0.911512
+[Iteration  9]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 0.981651
+ - AUC: 0.947368
+[Iteration 10]
+ - Shuffling data
+ - Fitting classifier
+ - Test-set accuracy: 1.000000
+ - AUC: 1.000000
+Average accuracy: 0.982569

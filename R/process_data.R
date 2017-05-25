@@ -1,3 +1,26 @@
+# ======================UTILITY FUNCTIONS=========================
+pretty_print_progress = function(text, curr, total) {
+  cat(paste("\r", text, ": ", curr, "/", total, sep=""));
+  if (curr == total) {
+    cat("\n");
+  }
+}
+
+
+vert_stack = function(a, b) {
+  d_a <- colnames(a);
+  d_b <- colnames(b);
+  m_a <- match(d_a, d_b);
+  m_b <- match(d_b, d_a);
+  a <- a[,!is.na(m_a)];
+  b <- b[,!is.na(m_b)];
+  return(rbind(a,b));
+}
+# =====================END UTILITY FUNCTIONS======================
+
+
+
+
 # Loads data from ArrayExpress
 #   Preconditions
 #     - Folder structure:
@@ -11,16 +34,20 @@
 #           |----chip.adf.txt
 #
 #   Parameters
-#     folder     - top level folder (e.g. "C:/Users/user/data/E-GEOD-884422")
-#     dataset    - name of dataset (e.g. "E-GEOD-884422")
-#     funcs      - vector of functions to parse metadata from sdrf file
-#     adf        - filename of ADF file
-#     adf_sep    - delimiter in adf file
-#     sample_sep - delimiter in sample files
-#     sdrf_sep   - delimiter in sdrf file
+#     folder       - top level folder (e.g. "C:/Users/user/data/E-GEOD-884422")
+#     dataset      - name of dataset (e.g. "E-GEOD-884422")
+#     funcs        - vector of functions to parse metadata from sdrf file
+#     adf_id_col   - column name of intermediate identifiers
+#     entrez_table - table to convert from intermediate identifiers to entrez
+#     adf          - filename of ADF file
+#     adf_sep      - delimiter in adf file
+#     sample_sep   - delimiter in sample files
+#     sdrf_sep     - delimiter in sdrf file
 
 load_data = function(folder,
                      dataset,
+                     adf_id_col,
+                     entrez_table,
                      funcs,
                      adf,
                      adf_sep=",",
@@ -43,9 +70,6 @@ load_data = function(folder,
                          fill = TRUE,
                          na.strings = "");
   
-  library( org.Hs.eg.db );
-  entrez_table <- as.list( org.Hs.egREFSEQ2EG );
-  
   combined <- NULL;
   samples_count <- length(samples_files);
   
@@ -55,24 +79,24 @@ load_data = function(folder,
                        header = TRUE, 
                        sep = sample_sep,
                        na.strings = "");
-    probe_ids <- data[, 1];is
+    probe_ids <- data[, 1];
     
-    # Match sample probes with Refseq IDs
+    # Match sample probes IDs
     probe_matches <- match(probe_ids, adf_data[, 1]);
     
     
-    # Strip all non-existing refseq rows
-    probe_entrez <- adf_data[probe_matches, "Composite.Element.Database.Entry.refseq."];
-    data <- data[!is.na(probe_entrez), ];
-    probe_entrez <- probe_entrez[!is.na(probe_entrez)];
+    # Strip all non-existing rows
+    probes <- adf_data[probe_matches, adf_id_col];
+    data <- data[!is.na(probes), ];
+    probes <- probes[!is.na(probes)];
     
     
-    # Unique Refseq IDs
-    probe_entrez_u <- unique(probe_entrez);
-    u <- match(probe_entrez_u, probe_entrez);
+    # Unique probe IDs
+    probes_u <- unique(probes);
+    u <- match(probes_u, probes);
     data <- data[u, 2, drop=FALSE];
     
-    dimnames(data)[[1]] <- probe_entrez_u;
+    dimnames(data)[[1]] <- probes_u;
     dimnames(data)[[2]] <- c(samples_files[i]);
     
     if (dim(data)[[1]] > 0) {
@@ -90,11 +114,8 @@ load_data = function(folder,
     }
   }
   
-  
-  
   print("Converting gene identifiers into Entrez IDs");
-  library( org.Hs.eg.db );
-  entrez <- as.list( org.Hs.egREFSEQ2EG );
+  entrez <- entrez_table;
   entrez_exist <- names( entrez ) %in% dimnames( combined )[[1]];
   entrez <- entrez[ entrez_exist ]; 
   entrez <- unlist( entrez );
@@ -104,7 +125,6 @@ load_data = function(folder,
   combined <- combined[u, ];
   
   dimnames(combined)[[1]] <- entrez_u;
-  
   
   # Get patient data
   sdrf_fp <- paste(folder, "/", dataset, ".sdrf.txt", sep="");
@@ -128,9 +148,19 @@ load_data = function(folder,
   data <- t(combined[,1:ncol(combined)]);
   rm(combined);
   return(data);
-  
 }
 
+
+
+
+
+
+
+
+
+library( org.Hs.eg.db );
+refseq_entrez <- as.list( org.Hs.egREFSEQ2EG );
+genbank_entrez <- as.list( org.Hs.egACCNUM2EG );
 
 # =====================E-GEOD-84422 dataset=====================
 if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv")) {
@@ -150,13 +180,24 @@ if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-c
   )
   data_84422 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-84422",
                          "E-GEOD-84422",
+                         "Composite.Element.Database.Entry.refseq.",
+                         refseq_entrez,
                          funcs_84422,
                          "A-AFFY-33.adf.txt",
                          adf_sep=",",
                          sample_sep="\t",
                          sdrf_sep=",")
+  
+  colnames(data_84422)[length(colnames(data_84422))-2] = "gender";
+  colnames(data_84422)[length(colnames(data_84422))-1] = "age";
+  colnames(data_84422)[length(colnames(data_84422))] = "ad";
   write.csv(data_84422, file="C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv");
+} else {
+  data_84422 = read.csv(file="C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv");
+  colnames(data_84422) <- substring(colnames(data_84422), 2);
 }
+# =====================END OF E-GEOD-84422======================
+
 
 # =====================E-GEOD-48350 dataset=====================
 if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv")) {
@@ -168,7 +209,7 @@ if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-c
       return(1);
     },
     function(x) {   # AGE
-      return(strsplit(as.character(x[["Characteristics..age.yrs."]]), " ")[[1]][2]);
+      return(x[["Characteristics..age.yrs."]]);
     },
     function(x) {   # AD
       if (x[["Characteristics..braak.stage."]] > 0) {
@@ -177,13 +218,63 @@ if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-c
       return(0);
     }
   )
-  data_48350= load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-48350",
+  data_48350 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-48350",
                         "E-GEOD-48350",
+                        "Composite.Element.Database.Entry.refseq.",
+                        refseq_entrez,
                         funcs_48350,
                         "A-AFFY-44.adf.txt",
                         adf_sep="\t",
                         sample_sep="\t",
                         sdrf_sep=",")
+  colnames(data_48350)[length(colnames(data_48350))-2] = "gender";
+  colnames(data_48350)[length(colnames(data_48350))-1] = "age";
+  colnames(data_48350)[length(colnames(data_48350))] = "ad";
   write.csv(data_48350, file="C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv");
+} else {
+  data_48350 = read.csv(file="C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv");
+  colnames(data_48350) <- substring(colnames(data_48350), 2);
 }
+# =====================END OF E-GEOD-48350======================
 
+
+# =====================E-GEOD-63063 dataset=====================
+if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined-data.csv")) {
+  funcs_63063 = c(
+    function(x) {   # Gender
+      if (as.character(x[["Characteristics..sex."]]) == "female") {
+        return(0);
+      } 
+      return(1);
+    },
+    function(x) {   # AGE
+      return(x[["Characteristics..age."]]);
+    },
+    function(x) {   # AD
+      if (as.character(x[["Characteristics..included.in.case..control.study."]]) == "no") { return(0); }
+      return(1);
+    }
+  )
+  data_63063 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-63063",
+                         "E-GEOD-63063",
+                         "Reporter.Database.Entry..genbank.",
+                         genbank_entrez,
+                         funcs_63063,
+                         "A-GEOD-10558.adf.txt",
+                         adf_sep=",",
+                         sample_sep="\t",
+                         sdrf_sep="\t")
+  colnames(data_63063)[length(colnames(data_63063))-2] = "gender";
+  colnames(data_63063)[length(colnames(data_63063))-1] = "age";
+  colnames(data_63063)[length(colnames(data_63063))] = "ad";
+  write.csv(data_63063, file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined-data.csv");
+} else {
+  data_63063 = read.csv(file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined-data.csv");
+  colnames(data_63063) <- substring(colnames(data_63063), 2);
+}
+# =====================END OF E-GEOD-63063======================
+
+
+combined <- vert_stack(data_84422, data_48350);
+combined <- vert_stack(combined, data_63063);
+write.csv(combined, file="C:/Users/cwong/masters-thesis/data/combined.csv");

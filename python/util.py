@@ -5,46 +5,27 @@ import csv
 from random import shuffle
 import numpy as np
 
+def str_to_float(s):
+    try:
+        return float(s)
+    except ValueError: # Handle malformed data
+        return 0.0
+
 class DataReader():
     '''
     Utility class to parse RNA array data.
 
-    Input data is a CSV-formatted file, with the column
-    headers:
-        ''     - patient code
-        gender - converted to 0 for female, 1 for male
-        ad     - targets; 0 for healthy, >1 for braak scale
+    Input data is a CSV-formatted file, with the last
+    column being the targets.
     '''
     def __init__(self, fp, delimiter=','):
         self.reader = csv.reader(open(fp, 'r'), delimiter=delimiter)
         self.headers = next(self.reader, None)
-        self.fnc = {}
-        for i, h in enumerate(self.headers[:10]):
-            if h == '' or h == 'brainRegion' or h == 'ad':
-                pass
-            elif h == 'gender':
-                self.fnc[i] = lambda x: 0.0 if x == 'female' else 1.0
-            else:
-                self.fnc[i] = lambda x: float(x)
         self.x = []
         self.y = []
-        target_index = self.headers.index('ad')
         for row in self.reader:
-            self.x.append(self.preprocess(row))
-            if int(row[target_index]) > 0:
-                self.y.append([0, 1])
-            else:
-                self.y.append([1, 0])
-
-    def preprocess(self, entry):
-        res = []
-        for i, x in enumerate(entry[:10]):
-            try:
-                res.append(self.fnc[i](x))
-            except:
-                pass
-        res += entry[10:]
-        return res
+            self.x.append([str_to_float(x) for x in row[2:-1]])
+            self.y.append(int(row[-1]))
 
     def get_features(self):
         return self.x
@@ -63,7 +44,7 @@ class CrossValidation():
     '''
     def __init__(self, x, y, fold=10):
         assert len(x) == len(y), 'Length of input and targets are different!'
-        self.size = len(x)    
+        self.size = len(x)
         self.counter = 0       # Current fold being held out
         self.pointer = 0       # Pointer to non-retrieved data if batch size != (k-1)/k * size
         self.fold = fold       # Number of folds

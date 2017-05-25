@@ -5,8 +5,8 @@ import tensorflow as tf
 from util import DataReader, CrossValidation, partition_data
 
 
-fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
-
+#fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
+fp = '../data/combined.csv'
 
 def FFNN(x, weights, biases, keep_prob=0.5, h_l=2):
     h = tf.add(tf.matmul(x, weights['hidden_1']), biases['hidden_1'])
@@ -30,6 +30,17 @@ dropout_prob = 0.5 # keep_prob = 1 - dropout_prob
 
 # Read and parse input data
 x, y = DataReader(fp).get_data()
+
+def inverse_argmax(l):
+    m = len(set(l))
+    print(m)
+    for i in range(len(l)):
+        hold = l[i]
+        l[i] = [0] * m
+        l[i][hold] = 1
+
+inverse_argmax(y)
+
 partition = partition_data(x, y, [0.8, 0.2])
 data = CrossValidation(partition[0][0], partition[0][1], fold)
 test = np.array(partition[1][0]), np.array(partition[1][1])

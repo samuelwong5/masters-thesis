@@ -19,14 +19,14 @@ except:
 iterations = 1 if len(sys.argv) < 3 else int(sys.argv[2])
 
 
-#fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
-fp = '../data/E-GEOD-84422/E-GEOD-84422-combined2.csv'
+#fp = '../data/E-GEOD-48350/E-GEOD-48350-combined-data.csv'
+#fp = '../data/E-GEOD-84422/E-GEOD-84422-combined-data.csv'
 #fp = '../data/E-GEOD-63063/E-GEOD-63063-combined.csv'
+fp = '../data/combined.csv'
+
 
 print('Reading file')
 x, y = DataReader(fp).get_data()
-argmax = lambda x: x.index(max(x))
-y = list(map(argmax, y)) # Convert labels to 1-d
 
 def part(x, y):
     partition = partition_data(x, y, [0.8, 0.2])
@@ -37,6 +37,10 @@ def part(x, y):
     test_y = mli(partition[1][1])
     return train_x, train_y, test_x, test_y
 
+print('Number of samples: {}'.format(len(y)))
+print('Number of AD: {}'.format(sum(y)))
+
+print('Creating Cross-validation tool')
 mean_acc = 0.0
 folds = 10
 data = CrossValidation(x, y, folds)
@@ -62,7 +66,10 @@ for i in range(folds):
     test_y_pred = cfr.predict(test_x)
     acc_score = accuracy_score(test_y_pred, test_y)
     print(' - Test-set accuracy: {:5f}'.format(acc_score))
-    print(' - AUC: {:5f}'.format(roc_auc_score(test_y_pred, test_y)))
+    try:
+        print(' - AUC: {:5f}'.format(roc_auc_score(test_y_pred, test_y)))
+    except: # Handles case where shuffled test targets all belong to the same class
+        print(' - AUC: N/A (all test_y belongs to same class')
     mean_acc += acc_score
 mean_acc /= folds
 print('Average accuracy: {:5f}'.format(mean_acc))
