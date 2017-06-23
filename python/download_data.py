@@ -4,9 +4,13 @@ import re
 import requests
 import zipfile
 
+
 datasets = [
-    ('https://www.ebi.ac.uk/arrayexpress/experiments/E-GEOD-84422/files/', 'E-GEOD-84422')
+    #('https://www.ebi.ac.uk/arrayexpress/experiments/E-GEOD-84422/files/', 'E-GEOD-84422'),
+    ('https://www.ebi.ac.uk/arrayexpress/experiments/E-GEOD-63063/files/', 'E-GEOD-63063'),
+    #('https://www.ebi.ac.uk/arrayexpress/experiments/E-GEOD-48350/files/', 'E-GEOD-48350'),
 ]
+
 
 def download_file(url, folder):
     print('Downloading file: {}'.format(url))
@@ -20,6 +24,7 @@ def download_file(url, folder):
     else:
         print('  - Already exists!')
     return local_filename
+
 
 def download_arrayexpress(url, dataset):
     base_url = '/'.join(url.split('/')[:3])
@@ -36,7 +41,8 @@ def download_arrayexpress(url, dataset):
         os.makedirs(folder)
 
     # Get sequence data
-    aefiles = [a['href'] for a in soup.find('div', {'class': 'ae-files'}).find_all('a')][1:]
+    aefiles = [a['href'] for a in soup.find('div', {'class': 'ae-files'}).find_all('a')]
+    aefiles = list(filter(lambda x: 'processed' in x, aefiles))
     for f in aefiles:
         lf = download_file(base_url + f, folder)
         if lf[-4:] == '.zip':
@@ -48,8 +54,26 @@ def download_arrayexpress(url, dataset):
     # Get array data
     adffiles = [a['href'] for a in soup.find_all('a', href=re.compile('\\.adf.txt$'))]
     for f in adffiles:
-        download_file(base_url + f, folder)
+        lf = download_file(base_url + f, folder)
+        truncate_adf(lf)
 
-for url, dataset in datasets:
-    download_arrayexpress(url, dataset)
 
+def truncate_adf(adf_file):
+    try:
+        f = open(adf_file, 'r+')
+        d = f.readlines()
+        f.seek(0)
+        index = d.index('[main]\n')
+        print(adf_file, index)
+        for i in d[index+1:]:
+            f.write(i)
+            f.truncate()
+    except ValueError:
+        pass # ADF file does not have metadata
+    finally:
+        f.close()
+
+
+if __name__ == '__main__':
+    for url, dataset in datasets:
+        download_arrayexpress(url, dataset)

@@ -69,7 +69,6 @@ load_data = function(folder,
                          sep = adf_sep,
                          fill = TRUE,
                          na.strings = "");
-  
   combined <- NULL;
   samples_count <- length(samples_files);
   
@@ -84,13 +83,11 @@ load_data = function(folder,
     # Match sample probes IDs
     probe_matches <- match(probe_ids, adf_data[, 1]);
     
-    
     # Strip all non-existing rows
     probes <- adf_data[probe_matches, adf_id_col];
     data <- data[!is.na(probes), ];
     probes <- probes[!is.na(probes)];
-    
-    
+
     # Unique probe IDs
     probes_u <- unique(probes);
     u <- match(probes_u, probes);
@@ -98,7 +95,7 @@ load_data = function(folder,
     
     dimnames(data)[[1]] <- probes_u;
     dimnames(data)[[2]] <- c(samples_files[i]);
-    
+
     if (dim(data)[[1]] > 0) {
       if (is.null(combined)) {
         combined <- data;
@@ -114,17 +111,17 @@ load_data = function(folder,
     }
   }
   
-  print("Converting gene identifiers into Entrez IDs");
-  entrez <- entrez_table;
-  entrez_exist <- names( entrez ) %in% dimnames( combined )[[1]];
-  entrez <- entrez[ entrez_exist ]; 
-  entrez <- unlist( entrez );
-  combined <- combined[names(entrez), ];
-  entrez_u <- unique(entrez);
-  u <- match(entrez_u, entrez);
-  combined <- combined[u, ];
+  #print("Converting gene identifiers into Entrez IDs");
+  #entrez <- entrez_table;
+  #entrez_exist <- names( entrez ) %in% dimnames( combined )[[1]];
+  #entrez <- entrez[ entrez_exist ]; 
+  #entrez <- unlist( entrez );
+  #combined <- combined[names(entrez), ];
+  #entrez_u <- unique(entrez);
+  #u <- match(entrez_u, entrez);
+  #combined <- combined[u, ];
   
-  dimnames(combined)[[1]] <- entrez_u;
+  #dimnames(combined)[[1]] <- entrez_u;
   
   # Get patient data
   sdrf_fp <- paste(folder, "/", dataset, ".sdrf.txt", sep="");
@@ -162,8 +159,13 @@ library( org.Hs.eg.db );
 refseq_entrez <- as.list( org.Hs.egREFSEQ2EG );
 genbank_entrez <- as.list( org.Hs.egACCNUM2EG );
 
+data_dir <- paste(dirname(dirname(sys.frame(1)$ofile)), 'data', sep='/')
+data_fp = function(relative_path) {
+  return(paste(data_dir, relative_path, sep='/'));
+}
+
 # =====================E-GEOD-84422 dataset=====================
-if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv")) {
+if (!file.exists(data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"))) {
   funcs_84422 = c(
     function(x) {   # Gender
       if (as.character(x[["Term.Accession.Number"]]) == "female") {
@@ -175,71 +177,79 @@ if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-c
       return(strsplit(as.character(x[["Comment..Sample_title."]]), " ")[[1]][2]);
     },
     function(x) {   # AD
-      return(switch(as.character(x[["ad"]]), normal=0, 1));
+      return(grepl("normal", x[["Term.Accession.Number"]], fixed=TRUE));
     }
   )
-  data_84422 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-84422",
+  data_84422 = load_data(data_fp("E-GEOD-84422"),
                          "E-GEOD-84422",
                          "Composite.Element.Database.Entry.refseq.",
                          refseq_entrez,
                          funcs_84422,
                          "A-AFFY-33.adf.txt",
-                         adf_sep=",",
+                         adf_sep="\t",
                          sample_sep="\t",
-                         sdrf_sep=",")
+                         sdrf_sep="\t")
   
   colnames(data_84422)[length(colnames(data_84422))-2] = "gender";
   colnames(data_84422)[length(colnames(data_84422))-1] = "age";
   colnames(data_84422)[length(colnames(data_84422))] = "ad";
-  write.csv(data_84422, file="C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv");
+  write.csv(data_84422, file=data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"));
 } else {
-  data_84422 = read.csv(file="C:/Users/cwong/masters-thesis/data/E-GEOD-84422/E-GEOD-84422-combined-data.csv");
+  data_84422 = read.csv(file=data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"));
   colnames(data_84422) <- substring(colnames(data_84422), 2);
 }
 # =====================END OF E-GEOD-84422======================
 
 
 # =====================E-GEOD-48350 dataset=====================
-if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv")) {
+if (!file.exists(data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"))) {
   funcs_48350 = c(
     function(x) {   # Gender
-      if (as.character(x[["Characteristics..sex."]]) == "female") {
+      if (grepl("female", x[["Comment..Sample_source_name."]], fixed=TRUE)) {
+        return(0);
+      } else if (grepl("male", x[["Comment..Sample_source_name."]], fixed=TRUE)) {
+        return(1);
+      } else if (grepl("female", x[["Characteristics..age.yrs."]], fixed=TRUE)) {
         return(0);
       } 
       return(1);
     },
     function(x) {   # AGE
-      return(x[["Characteristics..age.yrs."]]);
+      if (!is.na(as.numeric(x[["Characteristics..age.yrs."]]))) {
+        return(as.numeric(x[["Characteristics..age.yrs."]]));
+      } else {
+        return(as.numeric(strsplit(x[["Characteristics..apoe.genotype."]], ' ')[[1]][2]));
+      }
     },
     function(x) {   # AD
-      if (x[["Characteristics..braak.stage."]] > 0) {
+      if (!is.na(as.numeric(x[["Characteristics..braak.stage."]]))) {
         return(1);
       }
       return(0);
     }
   )
-  data_48350 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-48350",
-                        "E-GEOD-48350",
-                        "Composite.Element.Database.Entry.refseq.",
-                        refseq_entrez,
-                        funcs_48350,
-                        "A-AFFY-44.adf.txt",
-                        adf_sep="\t",
-                        sample_sep="\t",
-                        sdrf_sep=",")
+  data_48350 = load_data(data_fp("E-GEOD-48350"),
+                         "E-GEOD-48350",
+                         "Composite.Element.Database.Entry.refseq.",
+                         refseq_entrez,
+                         funcs_48350,
+                         "A-AFFY-44.adf.txt",
+                         adf_sep="\t",
+                         sample_sep="\t",
+                         sdrf_sep="\t")
   colnames(data_48350)[length(colnames(data_48350))-2] = "gender";
   colnames(data_48350)[length(colnames(data_48350))-1] = "age";
   colnames(data_48350)[length(colnames(data_48350))] = "ad";
-  write.csv(data_48350, file="C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv");
+  write.csv(data_48350, file=data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"));
 } else {
-  data_48350 = read.csv(file="C:/Users/cwong/masters-thesis/data/E-GEOD-48350/E-GEOD-48350-combined-data.csv");
+  data_48350 = read.csv(file=data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"));
   colnames(data_48350) <- substring(colnames(data_48350), 2);
 }
 # =====================END OF E-GEOD-48350======================
 
 
 # =====================E-GEOD-63063 dataset=====================
-if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined-data.csv")) {
+if (!file.exists(data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"))) {
   funcs_63063 = c(
     function(x) {   # Gender
       if (as.character(x[["Characteristics..sex."]]) == "female") {
@@ -251,30 +261,65 @@ if (!file.exists("C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-c
       return(x[["Characteristics..age."]]);
     },
     function(x) {   # AD
-      if (as.character(x[["Characteristics..included.in.case..control.study."]]) == "no") { return(0); }
+      if (as.character(x[["Characteristics..status."]]) == "CTL") { return(0); }
       return(1);
     }
   )
-  data_63063 = load_data("C:/Users/cwong/masters-thesis/data/E-GEOD-63063",
+  data_63063 = load_data(data_fp("E-GEOD-63063"),
                          "E-GEOD-63063",
                          "Reporter.Database.Entry..genbank.",
                          genbank_entrez,
                          funcs_63063,
                          "A-GEOD-10558.adf.txt",
-                         adf_sep=",",
+                         adf_sep="\t",
                          sample_sep="\t",
                          sdrf_sep="\t")
   colnames(data_63063)[length(colnames(data_63063))-2] = "gender";
   colnames(data_63063)[length(colnames(data_63063))-1] = "age";
   colnames(data_63063)[length(colnames(data_63063))] = "ad";
-  write.csv(data_63063, file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined-data.csv");
+  write.csv(data_63063, file=data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"));
 } else {
-  data_63063 = read.csv(file="C:/Users/cwong/masters-thesis/data/E-GEOD-63063/E-GEOD-63063-combined-data.csv");
+  data_63063 = read.csv(file=data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"));
   colnames(data_63063) <- substring(colnames(data_63063), 2);
 }
 # =====================END OF E-GEOD-63063======================
 
 
+# =====================E-GEOD-63063-2 dataset=====================
+if (!file.exists(data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"))) {
+  funcs_63063_2 = c(
+    function(x) {   # Gender
+      if (as.character(x[["Characteristics..sex."]]) == "female") {
+        return(0);
+      } 
+      return(1);
+    },
+    function(x) {   # AGE
+      return(x[["Characteristics..age."]]);
+    },
+    function(x) {   # AD
+      if (as.character(x[["Characteristics..status."]]) == "CTL") { return(0); }
+      return(1);
+    }
+  )
+  data_63063_2 = load_data(data_fp("E-GEOD-63063-2"),
+                         "E-GEOD-63063",
+                         "Reporter.Database.Entry..genbank.",
+                         genbank_entrez,
+                         funcs_63063_2,
+                         "A-GEOD-10558.adf.txt",
+                         adf_sep="\t",
+                         sample_sep="\t",
+                         sdrf_sep="\t")
+  colnames(data_63063_2)[length(colnames(data_63063_2))-2] = "gender";
+  colnames(data_63063_2)[length(colnames(data_63063_2))-1] = "age";
+  colnames(data_63063_2)[length(colnames(data_63063_2))] = "ad";
+  write.csv(data_63063_2, file=data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"));
+} else {
+  data_63063 = read.csv(file=data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"));
+  colnames(data_63063_2) <- substring(colnames(data_63063_2), 2);
+}
+# =====================END OF E-GEOD-63063======================
 combined <- vert_stack(data_84422, data_48350);
 combined <- vert_stack(combined, data_63063);
-write.csv(combined, file="C:/Users/cwong/masters-thesis/data/combined.csv");
+write.csv(combined, file=data_fp("combined.csv"));
