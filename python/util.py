@@ -79,10 +79,10 @@ class CrossValidation():
             nxt = self.pointer + batch_size
             batch_x = self.x[crr:nxt]
             batch_y = self.y[crr:nxt]
-        elif self.counter * self.fold_size <= nxt < (self.counter + 1) * self.fold_size:
-            nxt += self.fold_size
-            batch_x = self.x[crr:self.counter * batch_size] + self.x[(self.counter + 1) * self.batch_size:nxt]
-            batch_y = self.y[crr:self.counter * batch_size] + self.y[(self.counter + 1) * self.batch_size:nxt]
+        #elif self.counter * self.fold_size <= nxt < (self.counter + 1) * self.fold_size:
+        #    nxt += self.fold_size
+        #    batch_x = self.x[crr:self.counter * batch_size] + self.x[(self.counter + 1) * batch_size:nxt]
+        #    batch_y = self.y[crr:self.counter * batch_size] + self.y[(self.counter + 1) * batch_size:nxt]
         else:
             batch_x = self.x[crr:nxt]
             batch_y = self.y[crr:nxt]
