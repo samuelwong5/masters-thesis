@@ -16,8 +16,8 @@ def FFNN(x, weights, biases, keep_prob=0.5, h_l=2):
 
 
 # Parameters
-n_hidden_1 = 1024
-n_hidden_2 = 128
+n_hidden_1 = 512
+n_hidden_2 = 256
 n_classes = 2
 fold = 10 # Cross validation
 learning_rate = 1
@@ -116,7 +116,7 @@ ad_accuracy = tf.reduce_mean(tf.cast(ad_correct_pred, tf.float32))
 hd_accuracy = tf.reduce_mean(tf.cast(hd_correct_pred, tf.float32))
 
 init = tf.global_variables_initializer()
-v_lss_hist = []
+v_acc_hist = []
 # Train
 with tf.Session() as sess:
     sess.run(init)
@@ -130,7 +130,7 @@ with tf.Session() as sess:
             v_acc = sess.run(ad_accuracy, feed_dict={x: test_x, y: test_y, dim: len(test_x)})
             v_lss = sess.run(ad_cost, feed_dict={x: test_x, y: test_y, dim: len(test_x)})
             print('{0:9} |   {1:2.5f} |   {2:2.5f}'.format(i, v_lss, v_acc))
-            v_lss_hist.append(v_lss)
+            v_acc_hist.append(v_acc)
         else:
             train_x, train_y = hd_batches.next_batch(batch_size)
             sess.run(hd_optimizer, feed_dict={x: train_x, y: train_y, global_step: i})
@@ -140,9 +140,4 @@ with tf.Session() as sess:
             #print('{0:9} |   {1:2.5f} |   {2:2.5f}'.format(i, v_lss, v_acc))
 
 # Plot validation set and test set loss over epochs
-x_r = range(0, 1001)
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-ax1.scatter(x_r, v_lss_hist, label='Validation loss')
-plt.legend(loc='upper left')
-plt.show()
+print(sum(v_acc_hist[-10:]) / 10)

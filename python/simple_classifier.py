@@ -6,7 +6,7 @@ from util import DataReader, CrossValidation, partition_data
 
 
 #fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
-fp = '../data/combined.csv'
+fp = '../data/48350-AD_6-HD.csv'
 
 def FFNN(x, weights, biases, keep_prob=0.5, h_l=2):
     h = tf.add(tf.matmul(x, weights['hidden_1']), biases['hidden_1'])
@@ -21,7 +21,7 @@ def MAX(x, weights, biases, dim):
     return tf.concat([tf.ones([dim, 1], dtype=tf.float64), tf.zeros([dim, 1], dtype=tf.float64)], 1)
 
 # Parameters
-n_hidden_1 = 2048
+n_hidden_1 = 512
 n_hidden_2 = 128
 n_classes = 2
 fold = 10 # Cross validation
@@ -83,6 +83,7 @@ accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 init = tf.global_variables_initializer()
 
+t_acc_hist = []
 v_lss_hist = []
 t_lss_hist = []
 
@@ -100,12 +101,14 @@ with tf.Session() as sess:
         v_lss = sess.run(cost, feed_dict={x: test_x, y: test_y, dim: len(test_x)})
         t_acc = sess.run(accuracy, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
         t_lss = sess.run(cost, feed_dict={x: test[0], y: test[1], dim: len(test[0])})
-        v_lss_hist.append(v_lss)
-        t_lss_hist.append(t_lss)
-        print('{0:9} |   {1:2.5f} |   {2:2.5f} |   {3:2.5f} |    {4:2.4f}'.format(i, v_lss, v_acc, t_lss, t_acc))
+        #v_lss_hist.append(v_lss)
+        t_acc_hist.append(t_acc)
+        #t_lss_hist.append(t_lss)
+        #print('{0:9} |   {1:2.5f} |   {2:2.5f} |   {3:2.5f} |    {4:2.4f}'.format(i, v_lss, v_acc, t_lss, t_acc))
 
 
 # Plot validation set and test set loss over epochs
+'''
 x_r = range(0, 200)
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
@@ -113,3 +116,5 @@ ax1.scatter(x_r, v_lss_hist, label='Validation loss')
 ax1.scatter(x_r, t_lss_hist, label='Test loss')
 plt.legend(loc='upper left')
 plt.show()
+'''
+print(sum(t_acc_hist[-10:]) / 10)

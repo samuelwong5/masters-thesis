@@ -1,0 +1,3 @@
+resources:
+- name: samuel-vm
+  type: computer.v1.instance
