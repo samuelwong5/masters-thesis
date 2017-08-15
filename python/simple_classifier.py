@@ -6,7 +6,7 @@ from util import DataReader, CrossValidation, partition_data
 
 
 #fp = '../data/E-GEOD-48350/E-GEOD-48350-combined.csv'
-fp = '../data/combined.csv'
+fp = '../data/E-GEOD-48350/E-GEOD-48350-normal.csv'
 
 def FFNN(x, weights, biases, keep_prob=0.5, h_l=2):
     h = tf.add(tf.matmul(x, weights['hidden_1']), biases['hidden_1'])
@@ -71,12 +71,21 @@ elif model == FFNN:
     pred = model(x, weights, biases, keep_prob=1-dropout_prob)
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
 
+# Regularization Loss
+weights = tf.trainable_variables() # all vars of your graph
+l1_regularizer = tf.contrib.layers.l1_regularizer(
+   scale=0.005, scope=None
+)
+regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, weights)
+regularized_loss = cost + regularization_penalty # this loss needs to be minimized
+
+
 global_step = tf.Variable(0, trainable=False)
 starter_learning_rate = 1.0
 learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step,
                                            50, 0.5, staircase=False)
 if model != MAX:
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(regularized_loss)
 
 correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
@@ -89,7 +98,7 @@ t_lss_hist = []
 # Train
 with tf.Session() as sess:
     sess.run(init)
-    steps = 200
+    steps = 500
     print('Iteration | Valid loss | Valid acc  | Test loss  | Test acc   ')
     for i in range(steps):
         train_x, train_y = data.get_train_set()
@@ -106,7 +115,7 @@ with tf.Session() as sess:
 
 
 # Plot validation set and test set loss over epochs
-x_r = range(0, 200)
+x_r = range(0, 500)
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
 ax1.scatter(x_r, v_lss_hist, label='Validation loss')
