@@ -7,14 +7,14 @@ pretty_print_progress = function(text, curr, total) {
 }
 
 
-vert_stack = function(a, b) {
-  d_a <- colnames(a);
-  d_b <- colnames(b);
-  m_a <- match(d_a, d_b);
-  m_b <- match(d_b, d_a);
-  a <- a[,!is.na(m_a)];
-  b <- b[,!is.na(m_b)];
-  return(rbind(a,b));
+vert_stack = function(mat1, mat2) {
+  mat1 <- mat1[, !duplicated(colnames(mat1))]
+  mat2 <- mat2[, !duplicated(colnames(mat2))]
+  samecols <- intersect(colnames(mat1),colnames(mat2));
+  mat1 <- mat1[, samecols];
+  mat2 <- mat2[, samecols];
+  res = rbind(mat1, mat2);
+  return(res);
 }
 # =====================END UTILITY FUNCTIONS======================
 
@@ -174,10 +174,13 @@ if (!file.exists(data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"))) {
       return(1);
     },
     function(x) {   # AGE
-      return(strsplit(as.character(x[["Comment..Sample_title."]]), " ")[[1]][2]);
+      return(as.character(x[["Characteristics..age."]]));
     },
     function(x) {   # AD
-      return(grepl("normal", x[["Term.Accession.Number"]], fixed=TRUE));
+      if (grepl("normal", x[["FactorValue..neuropathological.category."]], fixed=TRUE)) {
+        return(0);
+      }
+      return(1);
     }
   )
   data_84422 = load_data(data_fp("E-GEOD-84422"),
@@ -195,8 +198,8 @@ if (!file.exists(data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"))) {
   colnames(data_84422)[length(colnames(data_84422))] = "ad";
   write.csv(data_84422, file=data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"));
 } else {
-  data_84422 = read.csv(file=data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"));
-  colnames(data_84422) <- substring(colnames(data_84422), 2);
+  data_84422 = read.csv(file=data_fp("E-GEOD-84422/E-GEOD-84422-combined-data.csv"), row.names=1);
+  #colnames(data_84422) <- substring(colnames(data_84422), 2);
 }
 # =====================END OF E-GEOD-84422======================
 
@@ -222,7 +225,7 @@ if (!file.exists(data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"))) {
       }
     },
     function(x) {   # AD
-      if (!is.na(as.numeric(x[["Characteristics..braak.stage."]]))) {
+      if (as.character(x[["Characteristics..braak.stage."]]) == "  ") {
         return(1);
       }
       return(0);
@@ -242,8 +245,9 @@ if (!file.exists(data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"))) {
   colnames(data_48350)[length(colnames(data_48350))] = "ad";
   write.csv(data_48350, file=data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"));
 } else {
-  data_48350 = read.csv(file=data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"));
-  colnames(data_48350) <- substring(colnames(data_48350), 2);
+  print("")
+  data_48350 = read.csv(file=data_fp("E-GEOD-48350/E-GEOD-48350-combined-data.csv"), row.names=1);
+  #colnames(data_48350) <- substring(colnames(data_48350), 1);
 }
 # =====================END OF E-GEOD-48350======================
 
@@ -279,8 +283,8 @@ if (!file.exists(data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"))) {
   colnames(data_63063)[length(colnames(data_63063))] = "ad";
   write.csv(data_63063, file=data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"));
 } else {
-  data_63063 = read.csv(file=data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"));
-  colnames(data_63063) <- substring(colnames(data_63063), 2);
+  data_63063 = read.csv(file=data_fp("E-GEOD-63063/E-GEOD-63063-combined-data.csv"), row.names=1);
+  #colnames(data_63063) <- substring(colnames(data_63063), 1);
 }
 # =====================END OF E-GEOD-63063======================
 
@@ -316,10 +320,146 @@ if (!file.exists(data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"))) {
   colnames(data_63063_2)[length(colnames(data_63063_2))] = "ad";
   write.csv(data_63063_2, file=data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"));
 } else {
-  data_63063 = read.csv(file=data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"));
-  colnames(data_63063_2) <- substring(colnames(data_63063_2), 2);
+  data_63063_2 = read.csv(file=data_fp("E-GEOD-63063-2/E-GEOD-63063-2-combined-data.csv"), row.names=1);
+  #colnames(data_63063_2) <- substring(colnames(data_63063_2), 1);
 }
 # =====================END OF E-GEOD-63063======================
-combined <- vert_stack(data_84422, data_48350);
-combined <- vert_stack(combined, data_63063);
-write.csv(combined, file=data_fp("combined.csv"));
+
+
+# =====================E-GEOD-28894 dataset=====================
+if (!file.exists(data_fp("E-AFMX-6/E-AFMX-6-combined-data.csv"))) {
+  funcs_6 = c(
+    function(x) {   # Gender
+      if (as.character(x[["Characteristics..Sex."]]) == "female") {
+        return(0);
+      } 
+      return(1);
+    },
+    function(x) {   # AGE
+      return(x[["Characteristics..Age."]]);
+    },
+    function(x) {   # AD
+      if (as.character(x[["Characteristics..DiseaseState."]]) == "normal") { return(0); }
+      return(1);
+    }
+  )
+  data_28894 = load_data(data_fp("E-AFMX-6"),
+                           "E-AFMX-6",
+                           "Composite.Elementr.Database.Entry.refseq.",
+                           refseq_entrez,
+                           funcs_6,
+                           "A-AFFY-33.adf.txt",
+                           adf_sep="\t",
+                           sample_sep="\t",
+                           sdrf_sep="\t")
+  colnames(data_28894)[length(colnames(data_28894))-2] = "gender";
+  colnames(data_28894)[length(colnames(data_28894))-1] = "age";
+  colnames(data_28894)[length(colnames(data_28894))] = "ad";
+  write.csv(data_28894, file=data_fp("E-AFMX-6/E-AFMX-6-combined-data.csv"));
+} else {
+  data_28894 = read.csv(file=data_fp("E-AFMX-6/E-AFMX-6-combined-data.csv"), row.names=1);
+  #colnames(data_63063_2) <- substring(colnames(data_63063_2), 1);
+}
+# =====================END OF E-AFMX-6======================
+
+extract_matrix_columns = function(m, group, offset) {
+    indices = 1:(dim(m)[2]/group)
+    for (i in 1:length(indices)) {
+      indices[i] = indices[i] * group - group + offset;
+    }
+    return(m[, indices]);
+}
+
+ae_extract_processed = function(folder,
+                                dataset,
+                                adf_id_col,
+                                entrez_table,
+                                funcs,
+                                adf,
+                                proc_group,
+                                proc_offset,
+                                adf_sep=",",
+                                sample_sep=",",
+                                sdrf_sep=",") {
+  require(R.utils);
+  require(data.table);
+  require(pracma);
+
+  samples_dir <- paste(folder, "samples", sep="/");
+  samples_files <- list.files(samples_dir);
+  print(paste("Number of samples detected: ", length(samples_files), sep=""))
+  
+  print("Reading ADF file")
+  adf <- paste(folder, adf, sep="/");
+  adf_data <- read.table(file = adf,
+                         header = TRUE,
+                         sep = adf_sep,
+                         fill = TRUE,
+                         na.strings = "");
+  combined <- NULL;
+  samples_count <- length(samples_files);
+  for (i in 1:samples_count) {
+    pretty_print_progress("Processing sample files", i, samples_count);
+    data <- read.table(file = paste(samples_dir, samples_files[i], sep="/"),
+                       header = TRUE, 
+                       sep = sample_sep,
+                       na.strings = "");
+    data <- data[-1,]; # Drop second set of column headers
+    probe_ids <- data[, 1];
+    data <- extract_matrix_columns(data, proc_group, proc_offset);
+
+    
+    # Match sample probes IDs
+    probe_matches <- match(probe_ids, adf_data[, 1]);
+    
+    # Strip all non-existing rows
+    probes <- adf_data[probe_matches, adf_id_col];
+    data <- data[!is.na(probes), ];
+    probes <- probes[!is.na(probes)];
+    
+    # Unique probe IDs
+    probes_u <- unique(probes);
+    u <- match(probes_u, probes);
+    data <- data[u, ];
+    
+    dimnames(data)[[1]] <- probes_u;
+    data <- t(data);
+    if (is.null(combined)) {
+      combined <- data;
+    } else {
+      combined <- vert_stack(combined, data);
+    }
+  }
+  return(combined);
+}
+
+sdrf_6 = read.table(file = "C:/Users/user/Projects/masters-thesis/data/E-AFMX-6/E-AFMX-6.sdrf.txt", header=TRUE,sep="\t",fill=TRUE,na.strings="", stringsAsFactors=FALSE)
+
+for (i in 1:dim(sdrf_6)[1]) { 
+  a = sdrf_6[i, 1]; 
+  a = sub('^([0-9])', 'X\\1', a);
+  a = gsub(' ', '.', a);
+  sdrf_6[i, 1] = a;
+}
+sdrf_6_u = unique(sdrf_6[,1]);
+match_ind = match(sdrf_6_u, sdrf_6[,1]);
+sdrf_6 <- sdrf_6[match_ind, ];
+
+rownames(sdrf_6) = sdrf_6[,1];
+
+c_dim <- dim(data_6)[2];
+data_6 = cbind(data_6, matrix(, nrow=dim(data_6)[1], ncol=3));
+for (i in 1:dim(data_6)[1]) { 
+  a = rownames(data_6)[i]; 
+  a = sub('.{4}$', '', a);
+  for (j in 1:length(funcs)) {
+    data_6[i, c_dim + j] <- funcs[[j]](sdrf_6[a, ]);
+  }
+}
+colnames(data_6)[dim(data_6)[2]-2] = 'gender';
+colnames(data_6)[dim(data_6)[2]-1] = 'age';
+colnames(data_6)[dim(data_6)[2]] = 'ad';
+#test = ae_extract_processed(data_fp("E-AFMX-6"), "E-AFMX-6", "Composite.Element.Database.Entry.refseq.", refseq_entrez, funcs_6, "A-AFFY-33.adf.txt", 6, 5, adf_sep="\t", sample_sep="\t", sdrf_sep="\t")
+#combined <- vert_stack(data_84422, data_48350);
+#combined <- vert_stack(combined, data_63063);
+#write.csv(combined, file=data_fp("combined.csv"));

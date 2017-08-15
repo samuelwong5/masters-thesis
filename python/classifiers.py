@@ -1,9 +1,10 @@
 import numpy as np
+import os
 from random import shuffle
+from sklearn import linear_model
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.svm import SVC
-from sklearn.metrics import roc_auc_score
 import sys
 
 from util import DataReader, partition_data, CrossValidation
@@ -18,15 +19,22 @@ except:
 
 iterations = 1 if len(sys.argv) < 3 else int(sys.argv[2])
 
+dataset_folder = '../data'
+dataset_names = [
+    'E-GEOD-48350',
+    'E-GEOD-84422',
+    'E-GEOD-63063',
+    'E-GEOD-63063-2',
+]
 
-#fp = '../data/E-GEOD-48350/E-GEOD-48350-combined-data.csv'
-#fp = '../data/E-GEOD-84422/E-GEOD-84422-combined-data.csv'
-#fp = '../data/E-GEOD-63063/E-GEOD-63063-combined.csv'
-fp = '../data/combined.csv'
-
+datasets = list(map(lambda x: os.path.join(dataset_folder, x), dataset_names))
 
 print('Reading file')
-x, y = DataReader(fp).get_data()
+dataset = datasets[0]
+x, y = DataReader(dataset).get_data()
+
+clf = linear_model.Lasso(alpha=1.0)
+clf.fit(x, y)
 
 def part(x, y):
     partition = partition_data(x, y, [0.8, 0.2])
@@ -73,3 +81,4 @@ for i in range(folds):
     mean_acc += acc_score
 mean_acc /= folds
 print('Average accuracy: {:5f}'.format(mean_acc))
+
